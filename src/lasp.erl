@@ -34,6 +34,7 @@
          declare/2,
          declare_dynamic/2,
          update/3,
+         transaction/2,
          bind/2,
          bind_to/2,
          read/2,
@@ -127,6 +128,19 @@ declare(Id, Type) ->
 -spec update(id(), operation(), actor()) -> {ok, var()} | {error, timeout}.
 update(Id, Operation, Actor) ->
     do(update, [Id, Operation, Actor]).
+
+%% @doc Transaction of multiple dataflow variables.
+%%
+%%      Read the 'List' and update element of it with the operation
+%%      associated.
+%%
+-spec transaction(list(), actor()) -> {ok, var()} | {error, timeout}.
+    transaction(List, Actor) ->
+        lists:foreach(fun(Element) ->
+                        Id = lists:nth(1, Element),
+                        Operation = lists:nth(2, Element),
+                        do(update, [Id, Operation, Actor])
+                      end, List).
 
 %% @doc Bind a dataflow variable to a value.
 %%
