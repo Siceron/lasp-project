@@ -247,7 +247,7 @@ handle_info({state_sync, ObjectFilterFun},
     lists:foreach(SyncFun, Peers),
 
     %% Schedule next synchronization.
-    schedule_state_synchronization(),
+    %% schedule_state_synchronization(),
 
     {noreply, State};
 
