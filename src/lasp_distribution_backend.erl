@@ -36,6 +36,7 @@
          stream/2,
          query/1,
          update/3,
+         transaction/2,
          bind/2,
          bind_to/2,
          read/2,
@@ -121,6 +122,20 @@ query(Id) ->
 -spec update(id(), operation(), actor()) -> {ok, var()} | error().
 update(Id, Operation, Actor) ->
     gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity).
+
+%% @doc Transaction of multiple dataflow variables.
+%%
+%%      Read the 'List' and update element of it with the operation
+%%      associated.
+%%
+-spec transaction(list(), actor()) -> {ok, var()} | {error, timeout}.
+transaction(List, Actor) ->
+    lists:foreach(fun(Element) ->
+                    Id = lists:nth(1, Element),
+                    Operation = lists:nth(2, Element),
+                    gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity)
+                  end, List),
+    lasp_state_based_synchronization_backend:store_changes().
 
 %% @doc Bind a dataflow variable to a value.
 %%

@@ -135,12 +135,8 @@ update(Id, Operation, Actor) ->
 %%      associated.
 %%
 -spec transaction(list(), actor()) -> {ok, var()} | {error, timeout}.
-    transaction(List, Actor) ->
-        lists:foreach(fun(Element) ->
-                        Id = lists:nth(1, Element),
-                        Operation = lists:nth(2, Element),
-                        do(update, [Id, Operation, Actor])
-                      end, List).
+transaction(List, Actor) ->
+    do(transaction, [List, Actor]).
 
 %% @doc Bind a dataflow variable to a value.
 %%

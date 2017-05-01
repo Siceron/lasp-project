@@ -25,7 +25,8 @@
 -behaviour(lasp_synchronization_backend).
 
 %% API
--export([start_link/1]).
+-export([start_link/1,
+         store_changes/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -69,6 +70,9 @@ start_link(Opts) ->
 
 blocking_sync(ObjectFilterFun) ->
     gen_server:call(?MODULE, {blocking_sync, ObjectFilterFun}, infinity).
+
+store_changes() ->
+    io:fwrite("Hello world!~n", []).
 
 %%%===================================================================
 %%% gen_server callbacks
