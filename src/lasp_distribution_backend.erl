@@ -135,7 +135,7 @@ transaction(List, Actor) ->
                     Operation = lists:nth(2, Element),
                     gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity)
                   end, List),
-    lasp_state_based_synchronization_backend:store_changes().
+    lasp_state_based_synchronization_backend:store_changes(List).
 
 %% @doc Bind a dataflow variable to a value.
 %%

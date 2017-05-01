@@ -26,7 +26,7 @@
 
 %% API
 -export([start_link/1,
-         store_changes/0]).
+         store_changes/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -71,8 +71,23 @@ start_link(Opts) ->
 blocking_sync(ObjectFilterFun) ->
     gen_server:call(?MODULE, {blocking_sync, ObjectFilterFun}, infinity).
 
-store_changes() ->
-    io:fwrite("Hello world!~n", []).
+store_changes(List) ->
+    {ok, Members} = ?SYNC_BACKEND:membership(),
+    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
+
+    try
+        ets:new(buffer, [bag, named_table])
+    catch
+        error:X -> io:fwrite("~p ~n", [X])
+    end,
+
+    SyncFun = fun(Peer) ->
+                  lists:foreach(fun(Element) ->
+                                    Id = lists:nth(1, Element),
+                                    ets:insert(buffer, {Peer, Id})
+                                end, List)
+              end,
+    lists:foreach(SyncFun, Peers).
 
 %%%===================================================================
 %%% gen_server callbacks
