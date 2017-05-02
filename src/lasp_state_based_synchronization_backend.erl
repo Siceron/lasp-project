@@ -56,6 +56,10 @@
 %% state_based messages:
 extract_log_type_and_payload({state_ack, _From, _Id, {_Id, _Type, _Metadata, State}}) ->
     [{state_ack, State}];
+extract_log_type_and_payload({trans_send, Buffer, From}) ->
+    [{trans_send, Buffer, From}];
+extract_log_type_and_payload({trans_ack, From}) ->
+    [{trans_send, From}];
 extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}, _AckRequired}) ->
     [{Id, State}, {Type, State}, {state_send, State}, {state_send_protocol, Id}].
 
@@ -72,22 +76,7 @@ blocking_sync(ObjectFilterFun) ->
     gen_server:call(?MODULE, {blocking_sync, ObjectFilterFun}, infinity).
 
 store_changes(List) ->
-    {ok, Members} = ?SYNC_BACKEND:membership(),
-    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
-
-    try
-        ets:new(buffer, [bag, named_table])
-    catch
-        error:X -> io:fwrite("~p ~n", [X])
-    end,
-
-    SyncFun = fun(Peer) ->
-                  lists:foreach(fun(Element) ->
-                                    Id = lists:nth(1, Element),
-                                    ets:insert(buffer, {Peer, Id})
-                                end, List)
-              end,
-    lists:foreach(SyncFun, Peers).
+    gen_server:call(?MODULE, {store_changes, List}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -111,6 +100,10 @@ init([Store, Actor]) ->
         false ->
             schedule_state_synchronization()
     end,
+
+    ets:new(buffer, [bag, named_table]),
+
+    schedule_transaction_synchronization(),
 
     %% Schedule periodic plumtree refresh.
     schedule_plumtree_peer_refresh(),
@@ -160,6 +153,16 @@ handle_call({blocking_sync, ObjectFilterFun}, From,
             % lager:info("No peers, not blocking.", []),
             {reply, ok, State}
     end;
+
+handle_call({store_changes, List}, _From, State) ->
+    {ok, Members} = ?SYNC_BACKEND:membership(),
+    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
+
+    SyncFun = fun(Peer) ->
+                  ets:insert(buffer, {Peer, List})
+              end,
+    lists:foreach(SyncFun, Peers),
+    {noreply, State};
 
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -225,12 +228,45 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
 
     {noreply, State};
 
+handle_cast({trans_send, Buffer, From}, State)->
+    io:fwrite("From ~p Buffer ~p~n", [From,Buffer]),
+
+    ?SYNC_BACKEND:send(?MODULE, {trans_ack, node()}, From),
+
+    {noreply, State};
+
+handle_cast({trans_ack, From}, State)->
+    io:fwrite("Ack From ~p~n", [From]),
+
+    ets:delete(buffer, From),
+
+    {noreply, State};
+
 handle_cast(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
+
+handle_info(trans_sync, State)->
+
+    {ok, Members} = ?SYNC_BACKEND:membership(),
+    %% Remove ourself and compute exchange peers.
+    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
+
+    %% Ship buffered updates for the fanout value.
+    SyncFun = fun(Peer) ->
+                case length(ets:lookup(buffer, Peer)) /= 0 of
+                    true -> ?SYNC_BACKEND:send(?MODULE, {trans_send, ets:lookup(buffer, Peer), node()}, Peer);
+                    false -> ok
+                end
+              end,
+    lists:foreach(SyncFun, Peers),
+
+    schedule_transaction_synchronization(),
+
+    {noreply, State};
 
 handle_info({state_sync, ObjectFilterFun},
             #state{store=Store, gossip_peers=GossipPeers} = State) ->
@@ -307,6 +343,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+schedule_transaction_synchronization() ->
+    Interval = lasp_config:get(state_interval, 10000),
+    timer:send_after(Interval, trans_sync).
 
 %% @private
 schedule_state_synchronization() ->
