@@ -229,14 +229,24 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
     {noreply, State};
 
 handle_cast({trans_send, Buffer, From}, State)->
-    io:fwrite("From ~p Buffer ~p~n", [From,Buffer]),
+    io:fwrite("Received buffer from ~p~n", [From]),
+
+    lists:foreach(fun(Element) ->
+                    {_, List} = Element,
+                    lists:foreach(fun(El) ->
+                                    Id = lists:nth(1, El),
+                                    Operation = lists:nth(2, El),
+                                    Actor = self(),
+                                    erlang:apply(lasp_distribution_backend, update, [Id, Operation, Actor])
+                                  end, List)
+                  end, Buffer),
 
     ?SYNC_BACKEND:send(?MODULE, {trans_ack, node()}, From),
 
     {noreply, State};
 
 handle_cast({trans_ack, From}, State)->
-    io:fwrite("Ack From ~p~n", [From]),
+    io:fwrite("Received Ack From ~p~n", [From]),
 
     ets:delete(buffer, From),
 
