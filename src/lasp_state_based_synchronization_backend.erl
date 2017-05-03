@@ -248,7 +248,10 @@ handle_cast({trans_send, Buffer, From}, State)->
 handle_cast({trans_ack, From}, State)->
     io:fwrite("Received Ack From ~p~n", [From]),
 
-    ets:delete(buffer, From),
+    case ?AT_LEAST_ONCE_DELIVERY of 
+        true -> ets:delete(buffer, From);
+        false -> ok
+    end,
 
     {noreply, State};
 
@@ -268,7 +271,13 @@ handle_info(trans_sync, State)->
     %% Ship buffered updates for the fanout value.
     SyncFun = fun(Peer) ->
                 case length(ets:lookup(buffer, Peer)) /= 0 of
-                    true -> ?SYNC_BACKEND:send(?MODULE, {trans_send, ets:lookup(buffer, Peer), node()}, Peer);
+                    true -> 
+                            case ?AT_LEAST_ONCE_DELIVERY of
+                                true -> ?SYNC_BACKEND:send(?MODULE, {trans_send, ets:lookup(buffer, Peer), node()}, Peer);
+                                false -> 
+                                    ?SYNC_BACKEND:send(?MODULE, {trans_send, ets:lookup(buffer, Peer), node()}, Peer),
+                                    ets:delete(buffer, Peer)
+                            end;
                     false -> ok
                 end
               end,

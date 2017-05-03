@@ -14,6 +14,9 @@
 -define(TWOPSET_TYPE, twopset).
 -define(EVAL_NUMBER, 1).
 
+%% At-Least Once Message Delivery
+-define(AT_LEAST_ONCE_DELIVERY, true).
+
 %% Intermediary node modification.
 -define(INTERMEDIARY_NODE_MODIFICATION, false).
 
