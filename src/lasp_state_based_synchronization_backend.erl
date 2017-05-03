@@ -162,7 +162,7 @@ handle_call({store_changes, List}, _From, State) ->
                   ets:insert(buffer, {Peer, List})
               end,
     lists:foreach(SyncFun, Peers),
-    {noreply, State};
+    {reply, ok, State};
 
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
