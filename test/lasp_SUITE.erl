@@ -76,6 +76,7 @@ end_per_testcase(Case, Config) ->
 
 all() ->
     [
+     trans_test,
      contracted_latency_test,
      uncontracted_latency_test,
      latency_with_reads_test,
@@ -113,6 +114,10 @@ all() ->
 -define(TRIM, {trim, 100, 100}).
 
 -define(ID, <<"myidentifier">>).
+
+trans_test(_Config) ->	
+	lasp:transaction([[{<<"set">>, state_orset},{add, 1}],[{<<"set">>, state_orset},{add, 2}]], self()),
+	ok.
 
 contracted_latency_test(_Config) ->
     case lasp_config:get(dag_enabled, true) of
